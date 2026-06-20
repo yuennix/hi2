@@ -1,15 +1,16 @@
 openapi: 3.1.0
 info:
-  # Do not change the title, if the title changes, the import paths will be broken
   title: Api
   version: 0.1.0
-  description: API specification
+  description: Hi2 Temp Mail API
 servers:
   - url: /api
     description: Base API path
 tags:
   - name: health
     description: Health operations
+  - name: mail
+    description: Temporary email operations
 paths:
   /healthz:
     get:
@@ -24,6 +25,85 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/HealthStatus"
+
+  /mail/generate:
+    post:
+      operationId: generateEmail
+      tags: [mail]
+      summary: Generate a new temporary email address
+      description: Creates a new random temporary email address
+      responses:
+        "200":
+          description: Generated email address info
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EmailAddress"
+
+  /mail/inbox:
+    get:
+      operationId: getInbox
+      tags: [mail]
+      summary: Get inbox messages for an email address
+      description: Fetches all messages for the given temporary email
+      parameters:
+        - name: email
+          in: query
+          required: true
+          schema:
+            type: string
+          description: The temporary email address to fetch inbox for
+      responses:
+        "200":
+          description: List of inbox messages
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/EmailMessage"
+
+  /mail/message:
+    get:
+      operationId: fetchMessage
+      tags: [mail]
+      summary: Get a specific email message
+      description: Fetches the full content of a specific email message
+      parameters:
+        - name: messageId
+          in: query
+          required: true
+          schema:
+            type: string
+          description: The message ID
+        - name: email
+          in: query
+          required: true
+          schema:
+            type: string
+          description: The email address the message belongs to
+      responses:
+        "200":
+          description: Full message content
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EmailMessageDetail"
+
+  /mail/stats:
+    get:
+      operationId: getMailStats
+      tags: [mail]
+      summary: Get stats about temp mail usage
+      description: Returns usage statistics for the temp mail service
+      responses:
+        "200":
+          description: Mail usage stats
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MailStats"
+
 components:
   schemas:
     HealthStatus:
@@ -34,3 +114,120 @@ components:
       required:
         - status
 
+    EmailAddress:
+      type: object
+      properties:
+        email:
+          type: string
+          description: The generated temporary email address
+        username:
+          type: string
+          description: The username part of the email
+        domain:
+          type: string
+          description: The domain part of the email
+        expiresAt:
+          type: ["string", "null"]
+          description: ISO timestamp when this address expires (if applicable)
+      required:
+        - email
+        - username
+        - domain
+        - expiresAt
+
+    EmailMessage:
+      type: object
+      properties:
+        id:
+          type: string
+          description: Unique message identifier
+        from:
+          type: string
+          description: Sender email address
+        fromName:
+          type: ["string", "null"]
+          description: Sender display name
+        subject:
+          type: string
+          description: Email subject line
+        receivedAt:
+          type: string
+          description: ISO timestamp when message was received
+        isRead:
+          type: boolean
+          description: Whether the message has been read
+        preview:
+          type: string
+          description: Short preview of the email body
+      required:
+        - id
+        - from
+        - fromName
+        - subject
+        - receivedAt
+        - isRead
+        - preview
+
+    EmailMessageDetail:
+      type: object
+      properties:
+        id:
+          type: string
+        from:
+          type: string
+        fromName:
+          type: ["string", "null"]
+        subject:
+          type: string
+        receivedAt:
+          type: string
+        bodyHtml:
+          type: ["string", "null"]
+          description: Full HTML body of the email
+        bodyText:
+          type: ["string", "null"]
+          description: Plain text body of the email
+        attachments:
+          type: array
+          items:
+            $ref: "#/components/schemas/Attachment"
+      required:
+        - id
+        - from
+        - fromName
+        - subject
+        - receivedAt
+        - bodyHtml
+        - bodyText
+        - attachments
+
+    Attachment:
+      type: object
+      properties:
+        filename:
+          type: string
+        size:
+          type: integer
+        contentType:
+          type: string
+      required:
+        - filename
+        - size
+        - contentType
+
+    MailStats:
+      type: object
+      properties:
+        totalGenerated:
+          type: integer
+          description: Total number of email addresses generated
+        activeAddresses:
+          type: integer
+          description: Number of currently active addresses
+        totalMessagesReceived:
+          type: integer
+          description: Total messages received across all addresses
+      required:
+        - totalGenerated
+        - activeAddresses
+        - totalMessagesReceived

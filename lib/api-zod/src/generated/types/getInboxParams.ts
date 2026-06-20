@@ -6,6 +6,9 @@
  * OpenAPI spec version: 0.1.0
  */
 
-export interface HealthStatus {
-  status: string;
-}
+export type GetInboxParams = {
+/**
+ * The temporary email address to fetch inbox for
+ */
+email: string;
+};
