@@ -40,6 +40,71 @@ async function hi2Fetch(path: string, options: RequestInit = {}): Promise<any> {
   }
 }
 
+// ─── Check if a custom username is available on hi2.in ─────────────────────
+router.post("/mail/check-username", async (req, res) => {
+  const { username, domain } = req.body as { username?: string; domain?: string };
+  if (!username || !domain) {
+    return res.status(400).json({ error: "username and domain are required" });
+  }
+
+  const cleanUsername = username.trim().toLowerCase().replace(/[^a-z0-9._-]/g, "");
+  if (!cleanUsername) {
+    return res.status(400).json({ error: "invalid username" });
+  }
+  if (!DOMAINS.includes(domain)) {
+    return res.status(400).json({ error: "invalid domain" });
+  }
+
+  try {
+    const body = new URLSearchParams({
+      name: cleanUsername,
+      domain,
+    }).toString();
+
+    const response = await fetch(`${HI2_BASE}/new`, {
+      method: "POST",
+      headers: {
+        "Authorization": getAuthHeader(),
+        "Content-Type": "application/x-www-form-urlencoded",
+        "Accept": "application/json",
+      },
+      body,
+    });
+
+    const text = await response.text();
+    let data: any = {};
+    try { data = JSON.parse(text); } catch { /* ignore */ }
+
+    if (data?.email) {
+      const [u, d] = data.email.split("@");
+      return res.json({
+        available: true,
+        email: data.email,
+        username: u ?? cleanUsername,
+        domain: d ?? domain,
+        token: data.expiry && data.hash ? `${data.expiry}-${data.email}-${data.hash}` : null,
+        expiresAt: data.expiry ? new Date(data.expiry * 1000).toISOString() : null,
+      });
+    }
+
+    const errorMsg: string = (data?.error ?? "").toLowerCase();
+
+    if (
+      errorMsg.includes("taken") ||
+      errorMsg.includes("already") ||
+      errorMsg.includes("exist") ||
+      errorMsg.includes("unavailable") ||
+      errorMsg.includes("reserved")
+    ) {
+      return res.json({ available: false, reason: "taken" });
+    }
+
+    return res.json({ available: true });
+  } catch (err) {
+    return res.json({ available: true });
+  }
+});
+
 // ─── Generate a new temporary email ────────────────────────────────────────
 router.post("/mail/generate", async (_req, res) => {
   try {

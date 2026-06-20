@@ -2,12 +2,12 @@ import { useState } from "react";
 import { useEmailState, DOMAINS, type Domain } from "@/hooks/use-email";
 import { useMailWebSocket } from "@/hooks/use-mail-websocket";
 import {
-  Copy, RefreshCw, Trash2, Mail, Loader2, ChevronRight,
-  Wifi, WifiOff, AlertCircle, LogOut
+  Copy, Trash2, Mail, Loader2, ChevronRight,
+  Wifi, WifiOff, AlertCircle, LogOut, XCircle
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Link, useLocation } from "wouter";
+import { useLocation } from "wouter";
 import { useToast } from "@/hooks/use-toast";
 import { formatDistanceToNow } from "date-fns";
 
@@ -20,9 +20,30 @@ export default function Inbox() {
 
   const [inputUsername, setInputUsername] = useState(username);
   const [inputDomain, setInputDomain] = useState<Domain>(domain);
+  const [isChecking, setIsChecking] = useState(false);
+  const [takenError, setTakenError] = useState(false);
 
-  const handleConnect = () => {
-    if (!inputUsername.trim()) return;
+  const handleConnect = async () => {
+    const trimmed = inputUsername.trim();
+    if (!trimmed) return;
+    setTakenError(false);
+    setIsChecking(true);
+    try {
+      const res = await fetch("/api/mail/check-username", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ username: trimmed, domain: inputDomain }),
+      });
+      const data = await res.json();
+      if (data.available === false && data.reason === "taken") {
+        setTakenError(true);
+        return;
+      }
+    } catch {
+      // network error — proceed anyway
+    } finally {
+      setIsChecking(false);
+    }
     connect(inputUsername, inputDomain);
   };
 
@@ -85,8 +106,8 @@ export default function Inbox() {
             <div className="flex items-center gap-0 border border-primary/30 focus-within:border-primary transition-colors">
               <Input
                 value={inputUsername}
-                onChange={(e) => setInputUsername(e.target.value)}
-                onKeyDown={(e) => e.key === "Enter" && handleConnect()}
+                onChange={(e) => { setInputUsername(e.target.value); setTakenError(false); }}
+                onKeyDown={(e) => { if (e.key === "Enter") handleConnect(); }}
                 placeholder="username"
                 className="border-0 bg-transparent text-primary placeholder:text-primary/30 font-mono rounded-none focus-visible:ring-0 focus-visible:ring-offset-0 flex-1"
                 data-testid="input-username"
@@ -118,13 +139,27 @@ export default function Inbox() {
               </div>
             )}
 
+            {takenError && (
+              <div className="flex items-center gap-2 border border-red-500/50 bg-red-500/10 px-3 py-2 text-xs font-mono text-red-400">
+                <XCircle className="w-3 h-3 shrink-0" />
+                EMAIL_TAKEN — this address is already in use. Try a different username.
+              </div>
+            )}
+
             <Button
               onClick={handleConnect}
-              disabled={!inputUsername.trim()}
+              disabled={!inputUsername.trim() || isChecking}
               className="w-full bg-primary text-primary-foreground hover:bg-primary/80 rounded-none font-mono tracking-widest"
               data-testid="button-connect"
             >
-              CONNECT
+              {isChecking ? (
+                <span className="flex items-center gap-2">
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  CHECKING...
+                </span>
+              ) : (
+                "CONNECT"
+              )}
             </Button>
           </div>
         </div>
